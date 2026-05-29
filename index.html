@@ -74,12 +74,12 @@
                     });
                 }
 
-                // Determine max hours from the 'layer' property values like 'Hour_1', 'Hour_2', ...
+                // Determine max hours from the 'layer' property values like 'Hour1', 'Hour2', ...
                 const hoursSet = new Set();
                 if (data.features && Array.isArray(data.features)) {
                     data.features.forEach(f => {
                         const v = f.properties && f.properties.layer;
-                        if (typeof v === 'string' && v.startsWith('Hour_')) {
+                        if (typeof v === 'string' && v.startsWith('Hour')) {
                             const n = parseInt(v.split('_')[1], 10);
                             if (!isNaN(n)) hoursSet.add(n);
                         }
@@ -87,7 +87,7 @@
                 }
                 const maxHours = hoursSet.size ? Math.max(...hoursSet) : 24;
 
-                // Add flood layer with initial filter for Hour_1
+                // Add flood layer with initial filter for Hour1
                 map.addLayer({
                     id: 'flood-layer',
                     type: 'fill',
@@ -96,7 +96,7 @@
                         'fill-color': '#0080ff',
                         'fill-opacity': 0.6
                     },
-                    filter: ['==', ['get', 'layer'], 'Hour_1']
+                    filter: ['==', ['get', 'layer'], 'Hour1']
                 });
 
                 // Animation clock
@@ -105,7 +105,7 @@
 
                 function updateHour() {
                     currentHour = currentHour < maxHours ? currentHour + 1 : 1;
-                    const filter = ['==', ['get', 'layer'], 'Hour_' + currentHour];
+                    const filter = ['==', ['get', 'layer'], 'Hour' + currentHour];
                     map.setFilter('flood-layer', filter);
                     document.getElementById('hour-display').innerText = currentHour;
                 }
