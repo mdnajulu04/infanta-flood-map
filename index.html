@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Infanta Flood Simulation</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        #timer-box { position: absolute; top: 20px; left: 20px; background: white; padding: 15px; font-family: Arial, sans-serif; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.5); z-index: 1; }
+    </style>
+</head>
+<body>
+
+<div id="timer-box">
+    <h2>Storm Timeline</h2>
+    <p>Current Hour: <span id="hour-display">1</span></p>
+</div>
+
+<div id="map"></div>
+
+<script>
+    // Insert your Mapbox Token here
+    mapboxgl.accessToken = 'pk.eyJ1Ijoia3R4Y2FzIiwiYSI6ImNtcHFpOGY5cTBkaTUycXNhN3ZnaWRzaTQifQ.HLu2KHQSPfH5L8s4sI3Utw';
+
+    // Initialize the map centered on Infanta
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/satellite-streets-v12',
+        center: [121.65, 14.75],
+        zoom: 11,
+        pitch: 45
+    });
+
+    map.on('load', () => {
+        // Add 3D terrain
+        map.addSource('mapbox-dem', {
+            'type': 'raster-dem',
+            'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            'tileSize': 512,
+            'maxzoom': 14
+        });
+        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+
+        // Optionally add a sky layer for better 3D feel
+        if (!map.getLayer('sky')) {
+            map.addLayer({
+                id: 'sky',
+                type: 'sky',
+                paint: {
+                    'sky-type': 'atmosphere',
+                    'sky-atmosphere-sun': [0.0, 0.0],
+                    'sky-atmosphere-sun-intensity': 15
+                }
+            });
+        }
+
+        // Load GeoJSON (replace the filename or path if different)
+        fetch('Infanta_Flood.geojson')
+            .then(resp => {
+                if (!resp.ok) throw new Error('Failed to load GeoJSON: ' + resp.statusText);
+                return resp.json();
+            })
+            .then(data => {
+                // Add the geojson as a source
+                if (map.getSource('flood-data')) {
+                    map.getSource('flood-data').setData(data);
+                } else {
+                    map.addSource('flood-data', {
+                        type: 'geojson',
+                        data: data
+                    });
+                }
+
+                // Determine max hours from the 'layer' property values like 'Hour_1', 'Hour_2', ...
+                const hoursSet = new Set();
+                if (data.features && Array.isArray(data.features)) {
+                    data.features.forEach(f => {
+                        const v = f.properties && f.properties.layer;
+                        if (typeof v === 'string' && v.startsWith('Hour_')) {
+                            const n = parseInt(v.split('_')[1], 10);
+                            if (!isNaN(n)) hoursSet.add(n);
+                        }
+                    });
+                }
+                const maxHours = hoursSet.size ? Math.max(...hoursSet) : 24;
+
+                // Add flood layer with initial filter for Hour_1
+                map.addLayer({
+                    id: 'flood-layer',
+                    type: 'fill',
+                    source: 'flood-data',
+                    paint: {
+                        'fill-color': '#0080ff',
+                        'fill-opacity': 0.6
+                    },
+                    filter: ['==', ['get', 'layer'], 'Hour_1']
+                });
+
+                // Animation clock
+                let currentHour = 1;
+                const intervalMs = 800;
+
+                function updateHour() {
+                    currentHour = currentHour < maxHours ? currentHour + 1 : 1;
+                    const filter = ['==', ['get', 'layer'], 'Hour_' + currentHour];
+                    map.setFilter('flood-layer', filter);
+                    document.getElementById('hour-display').innerText = currentHour;
+                }
+
+                // Start the animation
+                const timer = setInterval(updateHour, intervalMs);
+
+                // Expose controls for debugging in console (optional)
+                window._floodTimer = { clear: () => clearInterval(timer), maxHours };
+
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Could not load Infanta_Flood.geojson. Check the file path and browser console for details.');
+            });
+    });
+</script>
+</body>
+</html>
